@@ -1,0 +1,123 @@
+*lvim-ts.txt*        Buffer-side treesitter runtime on built-in vim.treesitter
+
+==============================================================================
+CONTENTS                                                           *lvim-ts*
+
+  1. Introduction ........................... |lvim-ts-intro|
+  2. Installation ........................... |lvim-ts-installation|
+  3. Setup & configuration .................. |lvim-ts-setup|
+  4. How it works ........................... |lvim-ts-behavior|
+  5. Indentation ............................ |lvim-ts-indent|
+  6. API .................................... |lvim-ts-api|
+  7. Ecosystem .............................. |lvim-ts-ecosystem|
+
+==============================================================================
+1. INTRODUCTION                                              *lvim-ts-intro*
+
+lvim-ts is a buffer-side treesitter RUNTIME built entirely on Neovim's
+built-in |vim.treesitter| — no nvim-treesitter. On the first open of a
+filetype it ensures the parser (and its queries) are installed via lvim-pkg,
+turns highlighting on with |vim.treesitter.start()|, and applies a query-based
+treesitter indent (a consumer of the installed `indents.scm`, since Neovim
+core ships no treesitter indent engine).
+
+It owns no parser data and no install logic of its own — availability,
+compilation and the unified install prompt all live in lvim-pkg /
+lvim-installer. lvim-ts simply contributes a "this filetype needs parser X"
+requirement to lvim-pkg and drives buffer activation.
+
+==============================================================================
+2. INSTALLATION                                       *lvim-ts-installation*
+
+Requires only `lvim-pkg` — its parser backend compiles parsers and installs
+their queries onto the runtimepath, so built-in |vim.treesitter| finds both.
+
+LVIM IDE: >lua
+  modules["lvim-tech/lvim-ts"] = {
+      dependencies = { "lvim-tech/lvim-pkg" },
+      opts = { auto_install = false },  -- offer parsers via lvim-installer's prompt
+  }
+<
+Standalone (lazy.nvim): >lua
+  {
+      "lvim-tech/lvim-ts",
+      dependencies = { "lvim-tech/lvim-pkg" },
+      opts = { auto_install = true },
+  }
+<
+With lvim-installer active, set `auto_install = false` so missing parsers are
+offered through the unified prompt instead of installing silently.
+
+==============================================================================
+3. SETUP & CONFIGURATION                                     *lvim-ts-setup*
+
+                                                            *lvim-ts.setup()*
+`setup(opts)` merges the given options into the live defaults in place, then
+registers on-demand activation + the parser requirement provider. >lua
+  require("lvim-ts").setup({
+      auto_install = true,       -- install a missing parser on first open (via lvim-pkg)
+      ensure_installed = {},     -- e.g. { "lua", "go" } or "all" (every available parser)
+      ignore_install = {},       -- excluded when ensure_installed = "all"
+  })
+<
+Fields (|LvimTsConfig|):
+
+  auto_install      boolean         Install a missing parser automatically on
+                                   the first open of its filetype. Default true.
+  ensure_installed  string[]|"all"  Parsers to install silently at setup. A list
+                                   installs exactly those; "all" installs every
+                                   available parser except `ignore_install`.
+                                   Default {}.
+  ignore_install    string[]        Parsers to exclude when
+                                   ensure_installed = "all". Default {}.
+
+==============================================================================
+4. HOW IT WORKS                                           *lvim-ts-behavior*
+
+On `setup()`:
+  - registers a parser-requirement provider with lvim-pkg (so the unified
+    install prompt can offer a filetype's missing parser),
+  - installs the `ensure_installed` parsers silently (resolving "all" against
+    the registry), and
+  - installs a FileType autocmd that activates every buffer (and sweeps the
+    already-open ones).
+
+On activation of a buffer (|lvim-ts.activate|, internal):
+  - resolve the parser language from the filetype,
+  - if the parser is installed, enable highlighting (and fetch missing queries
+    once, for a parser migrated from nvim-treesitter),
+  - else, when `auto_install` is on and the parser is available, install it via
+    lvim-pkg and enable on completion.
+
+Activation never blocks: installs are asynchronous and de-duplicated.
+
+==============================================================================
+5. INDENTATION                                              *lvim-ts-indent*
+
+Neovim core ships highlight / fold / select for treesitter but NO indent
+engine. lvim-ts adds one as an 'indentexpr', consuming the `indents.scm`
+queries (`@indent.begin` / `branch` / `dedent` / `end` / `ignore` / `zero`;
+`@indent.align` falls through). It is deliberately conservative: it returns
+`-1` ("keep the current indent") whenever unsure, so it never indents worse
+than Neovim's filetype indent. It is enabled per buffer only when the
+language ships an `indents` query.
+
+==============================================================================
+6. API                                                         *lvim-ts-api*
+
+  local ts = require("lvim-ts")
+
+  ts.setup(opts)            register activation + the requirement provider
+  ts.lang_for_buf(buf)      resolve a buffer's parser language (string|nil)
+  ts.enable(buf, lang)      enable highlighting + query indent for a buffer
+  ts.missing_for_ft(ft)     parser a filetype needs but lacks (string|nil)
+
+==============================================================================
+7. ECOSYSTEM                                             *lvim-ts-ecosystem*
+
+  lvim-pkg         the engine (parser availability + install)
+  lvim-installer   the install UI / unified prompt
+  lvim-ls          LSP engine
+  lvim-utils       shared UI / notify
+
+vim:tw=78:ts=8:noet:ft=help:norl:
