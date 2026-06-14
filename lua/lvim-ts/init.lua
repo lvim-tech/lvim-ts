@@ -79,6 +79,14 @@ function M.setup(opts)
         end)
         -- Silently install the configured parsers (ensure_installed).
         ensure_installed(pkg)
+        -- Optionally update installed parsers that are behind the registry (one pass).
+        if config.update_outdated then
+            pkg.check_parsers_outdated(function(outdated)
+                if outdated and #outdated > 0 then
+                    pkg.update("parser", outdated, function() end)
+                end
+            end)
+        end
     end
 
     -- Activate treesitter on every FileType, then sweep already-open buffers.

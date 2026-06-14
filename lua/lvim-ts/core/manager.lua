@@ -31,7 +31,21 @@ function M.lang_for_buf(buf)
     if ft == "" then
         return nil
     end
-    return vim.treesitter.language.get_lang(ft) or ft
+    return config.language_map[ft] or vim.treesitter.language.get_lang(ft) or ft
+end
+
+--- True when treesitter should be skipped for `buf` because the file exceeds
+--- config.max_filesize (a guard against lag on very large buffers; 0 disables it).
+--- Unsaved / nameless buffers (no file to stat) are never skipped.
+---@param buf integer
+---@return boolean
+local function too_big(buf)
+    local limit = config.max_filesize or 0
+    if limit <= 0 then
+        return false
+    end
+    local ok, stat = pcall(vim.uv.fs_stat, vim.api.nvim_buf_get_name(buf))
+    return ok and stat ~= nil and stat.size > limit
 end
 
 --- Turn treesitter highlighting on for a buffer via the built-in engine.
@@ -49,6 +63,23 @@ function M.enable(buf, lang)
     -- regresses below Neovim's filetype indent.
     if vim.treesitter.query.get(lang, "indents") then
         vim.bo[buf].indentexpr = "v:lua.require'lvim-ts.core.indent'.indentexpr()"
+    end
+    -- Treesitter folding (opt-in) — set the window-local fold options on every window currently
+    -- showing this buffer, when the language ships a `folds` query. New windows that open the
+    -- buffer later inherit nothing here; this covers the common load-in-a-window case.
+    if config.fold and vim.treesitter.query.get(lang, "folds") then
+        for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+            vim.wo[win].foldmethod = "expr"
+            vim.wo[win].foldexpr = "v:lua.vim.treesitter.foldexpr()"
+        end
+    end
+    -- Node-based incremental selection keymaps (opt-in), scoped to this buffer.
+    if config.incremental_selection and config.incremental_selection.enable then
+        require("lvim-ts.core.selection").attach(buf)
+    end
+    -- Generic node-type text-object keymaps (opt-in), scoped to this buffer.
+    if config.textobjects and config.textobjects.enable then
+        require("lvim-ts.core.textobjects").attach(buf)
     end
 end
 
@@ -74,6 +105,9 @@ function M.activate(buf)
     local lang = M.lang_for_buf(buf)
     if not lang then
         return
+    end
+    if too_big(buf) then
+        return -- skip treesitter entirely on oversized files
     end
     local p = pkg()
     if not p then
