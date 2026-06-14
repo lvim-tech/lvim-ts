@@ -11,7 +11,7 @@
 
 ---@type LvimTsConfig
 return {
-	auto_install = true,
-	ensure_installed = {},
-	ignore_install = {},
+    auto_install = true,
+    ensure_installed = {},
+    ignore_install = {},
 }

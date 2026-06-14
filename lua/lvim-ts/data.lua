@@ -12,23 +12,23 @@ local M = {}
 ---@param ft string
 ---@return string|nil
 function M.missing_for_ft(ft)
-	if ft == "" then
-		return nil
-	end
-	local ok, pkg = pcall(require, "lvim-pkg")
-	if not ok then
-		return nil
-	end
-	local lang = vim.treesitter.language.get_lang(ft) or ft
-	if pkg.is_installed("parser", lang) then
-		return nil
-	end
-	for _, candidate in ipairs(pkg.available("parser")) do
-		if candidate == lang then
-			return lang
-		end
-	end
-	return nil
+    if ft == "" then
+        return nil
+    end
+    local ok, pkg = pcall(require, "lvim-pkg")
+    if not ok then
+        return nil
+    end
+    local lang = vim.treesitter.language.get_lang(ft) or ft
+    if pkg.is_installed("parser", lang) then
+        return nil
+    end
+    for _, candidate in ipairs(pkg.available("parser")) do
+        if candidate == lang then
+            return lang
+        end
+    end
+    return nil
 end
 
 return M
