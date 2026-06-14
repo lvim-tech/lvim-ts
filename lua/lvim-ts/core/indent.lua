@@ -35,6 +35,30 @@ local function collect(query, root, bufnr)
     return maps
 end
 
+---@type table<integer, { tick: integer, lang: string, maps: table }>  per-buffer collect() cache
+local cache = {}
+
+--- collect() scans the whole tree (O(tree)) and runs on every indentexpr call (i.e. per line
+--- during a `=` re-indent). The tree only changes when the buffer does, so cache the maps per
+--- buffer keyed by 'changedtick': an indentexpr over an unchanged buffer (a re-indent of
+--- already-clean lines, or several calls within one tick) reuses them instead of re-querying.
+--- The maps hold node ids (integers), never node objects, so they keep no tree alive.
+---@param bufnr integer
+---@param lang string
+---@param query vim.treesitter.Query
+---@param root TSNode
+---@return table<string, table<integer, boolean>>
+local function maps_for(bufnr, lang, query, root)
+    local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+    local c = cache[bufnr]
+    if c and c.tick == tick and c.lang == lang then
+        return c.maps
+    end
+    local maps = collect(query, root, bufnr)
+    cache[bufnr] = { tick = tick, lang = lang, maps = maps }
+    return maps
+end
+
 --- Compute the indent (in spaces) for 1-based `lnum`, or -1 to keep the current indent.
 ---@param lnum? integer
 ---@return integer
@@ -50,12 +74,13 @@ function M.indentexpr(lnum)
     if not tree then
         return -1
     end
-    local query = vim.treesitter.query.get(parser:lang(), "indents")
+    local lang = parser:lang()
+    local query = vim.treesitter.query.get(lang, "indents")
     if not query then
         return -1
     end
     local root = tree:root()
-    local maps = collect(query, root, bufnr)
+    local maps = maps_for(bufnr, lang, query, root)
 
     -- Pick the starting node. For a blank line (the common "pressed Enter after a block
     -- opener" case) use the last node of the previous non-blank line, so the opener still
