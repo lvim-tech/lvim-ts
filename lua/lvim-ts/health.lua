@@ -52,6 +52,20 @@ function M.check()
         h.warn('config: expected auto_install:boolean, ensure_installed:string[]|"all", ignore_install:string[]')
     end
 
+    -- Opt-in feature flags (fold / incremental selection / text objects).
+    local sel = config.incremental_selection or {}
+    local to = config.textobjects or {}
+    h.info(
+        ("features: fold=%s  incremental_selection=%s  textobjects=%s"):format(
+            tostring(config.fold == true),
+            tostring(sel.enable == true),
+            tostring(to.enable == true)
+        )
+    )
+    if to.enable and type(to.types) ~= "table" then
+        h.warn("config: textobjects.enable is true but textobjects.types is not a table")
+    end
+
     -- ── installed parsers (built by lvim-pkg, discovered on the runtimepath) ───
     if ok_pkg then
         local installed = pkg.installed("parser") or {}

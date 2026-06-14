@@ -8,8 +8,9 @@ CONTENTS                                                           *lvim-ts*
   3. Setup & configuration .................. |lvim-ts-setup|
   4. How it works ........................... |lvim-ts-behavior|
   5. Indentation ............................ |lvim-ts-indent|
-  6. API .................................... |lvim-ts-api|
-  7. Ecosystem .............................. |lvim-ts-ecosystem|
+  6. Text objects ........................... |lvim-ts-textobjects|
+  7. API .................................... |lvim-ts-api|
+  8. Ecosystem .............................. |lvim-ts-ecosystem|
 
 ==============================================================================
 1. INTRODUCTION                                              *lvim-ts-intro*
@@ -70,6 +71,25 @@ Fields (|LvimTsConfig|):
                                    Default {}.
   ignore_install    string[]        Parsers to exclude when
                                    ensure_installed = "all". Default {}.
+  fold              boolean         Enable treesitter folding (foldexpr) when the
+                                   language ships a `folds` query. Default false.
+  max_filesize      integer         Skip treesitter (highlight / indent / fold) on
+                                   files larger than this many bytes. 0 disables
+                                   the guard. Default 1 MiB.
+  language_map      table           filetype -> parser overrides, e.g.
+                                   { ["html.handlebars"] = "glimmer" }. Default {}.
+  update_outdated   boolean         At setup, update installed parsers that are
+                                   behind the registry (one pass). Default false.
+  incremental_selection           Node-based incremental selection (opt-in). A
+                                   table { enable = false, keymaps = { init_selection
+                                   = "gnn", node_incremental = "grn", node_decremental
+                                   = "grm", scope_incremental = "grc" } }. When enabled,
+                                   the keymaps start / grow / shrink a selection by
+                                   treesitter node.
+  textobjects                     Generic node-type text objects (opt-in). A table
+                                   { enable = false, types = <kind -> node types>,
+                                   keymaps = { ["af"] = "@function.outer", ... } }.
+                                   See |lvim-ts-textobjects|.
 
 ==============================================================================
 4. HOW IT WORKS                                           *lvim-ts-behavior*
@@ -103,7 +123,42 @@ than Neovim's filetype indent. It is enabled per buffer only when the
 language ships an `indents` query.
 
 ==============================================================================
-6. API                                                         *lvim-ts-api*
+6. TEXT OBJECTS                                        *lvim-ts-textobjects*
+
+`textobjects.enable = true` installs operator-pending + visual keymaps for the
+syntax-aware text objects vim's built-in bracket text objects (`ib`/`ab`,
+`iB`/`aB`, `i(` …) cannot express — function / class / parameter:
+
+  af / if   a function / inner function (its body)
+  ac / ic   a class / struct / type / inner class
+  aa / ia   a parameter / argument (+ its comma) / inner parameter
+
+So `daf` deletes a whole function, `cif` changes its body, and `daa` removes a
+parameter with its trailing comma, leaving a valid argument list.
+
+It is deliberately QUERY-LESS. The precise route — a parser's `textobjects.scm`
+query — is parser DATA, which is lvim-pkg / the registry's domain, not lvim-ts's
+(it owns no parser data). Instead, for `function` / `class` it climbs to the
+nearest ancestor whose node TYPE is in the `types` map; for `parameter` it finds
+the named child of an argument / parameter LIST (the `lists` map) — because many
+grammars (lua / js) leave each item a bare identifier / expression, not its own
+node. `inner` comes from the node's `body` field / named children; `outer` of a
+parameter swallows the adjacent comma. `function` and `parameter` are precise;
+`class` inner is best-effort across grammars.
+
+Block kinds are NOT mapped by default — vim already has `ib`/`ab` (parens) and
+`iB`/`aB` (`{}`). Map `block` yourself if you want a treesitter-scoped variant.
+
+Extend a kind for a language by adding node types to `textobjects.types`, e.g.: >lua
+  require("lvim-ts").setup({
+      textobjects = {
+          enable = true,
+          types = { ["function"] = { "my_lang_func_node" } },  -- merged over the defaults
+      },
+  })
+<
+==============================================================================
+7. API                                                         *lvim-ts-api*
 
   local ts = require("lvim-ts")
 
@@ -113,7 +168,7 @@ language ships an `indents` query.
   ts.missing_for_ft(ft)     parser a filetype needs but lacks (string|nil)
 
 ==============================================================================
-7. ECOSYSTEM                                             *lvim-ts-ecosystem*
+8. ECOSYSTEM                                             *lvim-ts-ecosystem*
 
   lvim-pkg         the engine (parser availability + install)
   lvim-installer   the install UI / unified prompt
