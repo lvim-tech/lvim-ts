@@ -12,12 +12,17 @@ compilation and the unified install prompt all live in `lvim-pkg` /
 `lvim-installer`. lvim-ts simply contributes a "this filetype needs parser X"
 requirement to lvim-pkg and drives buffer activation.
 
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](https://github.com/lvim-tech/lvim-ts/blob/main/LICENSE)
+
 ## Installation
 
 Requires only `lvim-pkg` — the parser backend there compiles parsers and installs
 their queries onto the runtimepath, so the built-in `vim.treesitter` finds both.
 
 ### LVIM IDE
+
+Ships with LVIM IDE. Override its options in your user module
+(`lua/modules/user/init.lua`):
 
 ```lua
 modules["lvim-tech/lvim-ts"] = {
@@ -26,14 +31,40 @@ modules["lvim-tech/lvim-ts"] = {
 }
 ```
 
-### Standalone (lazy.nvim)
+### lazy.nvim
 
-```text
-{
-  "lvim-tech/lvim-ts",
-  dependencies = { "lvim-tech/lvim-pkg" },
-  opts = { auto_install = true },
+```lua
+return {
+    "lvim-tech/lvim-ts",
+    dependencies = { "lvim-tech/lvim-pkg" },
+    config = function()
+        require("lvim-ts").setup({ auto_install = true })
+    end,
 }
+```
+
+### Native (vim.pack / packadd)
+
+```lua
+-- In your init.lua, after the plugin is on the runtimepath:
+vim.pack.add({
+    { src = "https://github.com/lvim-tech/lvim-pkg" },
+    { src = "https://github.com/lvim-tech/lvim-ts" },
+})
+
+require("lvim-ts").setup({ auto_install = true })
+```
+
+### packer.nvim
+
+```lua
+use({
+    "lvim-tech/lvim-ts",
+    requires = { "lvim-tech/lvim-pkg" },
+    config = function()
+        require("lvim-ts").setup({ auto_install = true })
+    end,
+})
 ```
 
 > With `lvim-installer` active, set `auto_install = false` so missing parsers are
