@@ -12,6 +12,10 @@ local config = require("lvim-ts.config")
 
 local M = {}
 
+--- `:checkhealth lvim-ts` entry point — report the state of the built-in treesitter
+--- runtime, the lvim-pkg engine, the parser compile toolchain, the config shape and
+--- the installed parsers.
+---@return nil
 function M.check()
     local h = vim.health
     h.start("lvim-ts")

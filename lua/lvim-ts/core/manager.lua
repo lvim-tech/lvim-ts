@@ -7,6 +7,8 @@
 ---@module "lvim-ts.core.manager"
 
 local config = require("lvim-ts.config")
+local selection = require("lvim-ts.core.selection")
+local textobjects = require("lvim-ts.core.textobjects")
 
 local M = {}
 
@@ -75,11 +77,11 @@ function M.enable(buf, lang)
     end
     -- Node-based incremental selection keymaps (opt-in), scoped to this buffer.
     if config.incremental_selection and config.incremental_selection.enable then
-        require("lvim-ts.core.selection").attach(buf)
+        selection.attach(buf)
     end
     -- Generic node-type text-object keymaps (opt-in), scoped to this buffer.
     if config.textobjects and config.textobjects.enable then
-        require("lvim-ts.core.textobjects").attach(buf)
+        textobjects.attach(buf)
     end
 end
 

@@ -33,21 +33,40 @@ requirement to lvim-pkg and drives buffer activation.
 Requires only `lvim-pkg` — its parser backend compiles parsers and installs
 their queries onto the runtimepath, so built-in |vim.treesitter| finds both.
 
-LVIM IDE: >lua
-  modules["lvim-tech/lvim-ts"] = {
-      dependencies = { "lvim-tech/lvim-pkg" },
-      opts = { auto_install = false },  -- offer parsers via lvim-installer's prompt
-  }
+lvim-installer (recommended): install and manage it (with `lvim-pkg`) from the
+LVIM package manager — open the Plugins tab: >vim
+  :LvimInstaller plugins
 <
-Standalone (lazy.nvim): >lua
+lvim-installer installs plugins through Neovim's built-in `vim.pack`, so no
+external plugin manager is needed. With lvim-installer active, set
+`auto_install = false` so missing parsers are offered through the unified
+prompt instead of installing silently.
+
+lazy.nvim: >lua
   {
       "lvim-tech/lvim-ts",
       dependencies = { "lvim-tech/lvim-pkg" },
-      opts = { auto_install = true },
+      config = function()
+          require("lvim-ts").setup({ auto_install = true })
+      end,
   }
 <
-With lvim-installer active, set `auto_install = false` so missing parsers are
-offered through the unified prompt instead of installing silently.
+packer.nvim: >lua
+  use({
+      "lvim-tech/lvim-ts",
+      requires = { "lvim-tech/lvim-pkg" },
+      config = function()
+          require("lvim-ts").setup({ auto_install = true })
+      end,
+  })
+<
+Native (vim.pack): >lua
+  vim.pack.add({
+      { src = "https://github.com/lvim-tech/lvim-pkg" },
+      { src = "https://github.com/lvim-tech/lvim-ts" },
+  })
+  require("lvim-ts").setup({ auto_install = true })
+<
 
 ==============================================================================
 3. SETUP & CONFIGURATION                                     *lvim-ts-setup*
@@ -88,7 +107,11 @@ Fields (|LvimTsConfig|):
                                    treesitter node.
   textobjects                     Generic node-type text objects (opt-in). A table
                                    { enable = false, types = <kind -> node types>,
-                                   keymaps = { ["af"] = "@function.outer", ... } }.
+                                   lists = <kind -> list node types>, keymaps =
+                                   { ["af"] = "@function.outer", ... } }. `types`
+                                   maps function / class kinds to their node types;
+                                   `lists` maps the `parameter` kind to the list
+                                   nodes whose named child is one argument.
                                    See |lvim-ts-textobjects|.
 
 ==============================================================================
@@ -116,11 +139,13 @@ Activation never blocks: installs are asynchronous and de-duplicated.
 
 Neovim core ships highlight / fold / select for treesitter but NO indent
 engine. lvim-ts adds one as an 'indentexpr', consuming the `indents.scm`
-queries (`@indent.begin` / `branch` / `dedent` / `end` / `ignore` / `zero`;
-`@indent.align` falls through). It is deliberately conservative: it returns
-`-1` ("keep the current indent") whenever unsure, so it never indents worse
-than Neovim's filetype indent. It is enabled per buffer only when the
-language ships an `indents` query.
+queries (`@indent.begin` / `branch` / `dedent` / `end` / `ignore` / `zero`,
+and `@indent.align`). `@indent.align` is fully handled: inner rows align to
+just after the opener's `indent.open_delimiter`, and a row beginning with the
+`indent.close_delimiter` snaps back to the opener's own indent. It is
+deliberately conservative: it returns `-1` ("keep the current indent")
+whenever unsure, so it never indents worse than Neovim's filetype indent. It
+is enabled per buffer only when the language ships an `indents` query.
 
 ==============================================================================
 6. TEXT OBJECTS                                        *lvim-ts-textobjects*

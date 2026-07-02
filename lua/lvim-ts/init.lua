@@ -10,6 +10,7 @@
 local config = require("lvim-ts.config")
 local manager = require("lvim-ts.core.manager")
 local data = require("lvim-ts.data")
+local ok_utils, utils = pcall(require, "lvim-utils.utils")
 
 local M = {}
 
@@ -58,12 +59,19 @@ end
 ---@param opts? LvimTsConfig
 ---@return nil
 function M.setup(opts)
-    -- Merge user overrides into the live config (in place, so require()ers see them).
-    for k, v in pairs(opts or {}) do
-        if type(v) == "table" and type(config[k]) == "table" then
-            config[k] = vim.tbl_deep_extend("force", config[k], v)
-        else
-            config[k] = v
+    -- Merge user overrides into the live config in place (so require()ers see them). The
+    -- shared merge clean-REPLACES arrays, so an override like textobjects.types["function"]
+    -- or a shorter ignore_install list drops the stale default tail (vim.tbl_deep_extend
+    -- would index-merge and leave it behind).
+    if ok_utils and utils.merge then
+        utils.merge(config, opts or {})
+    elseif opts then
+        for k, v in pairs(opts) do
+            if type(v) == "table" and type(config[k]) == "table" then
+                config[k] = vim.tbl_deep_extend("force", config[k], v)
+            else
+                config[k] = v
+            end
         end
     end
 

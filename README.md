@@ -19,17 +19,18 @@ requirement to lvim-pkg and drives buffer activation.
 Requires only `lvim-pkg` — the parser backend there compiles parsers and installs
 their queries onto the runtimepath, so the built-in `vim.treesitter` finds both.
 
-### LVIM IDE
+### lvim-installer (recommended)
 
-Ships with LVIM IDE. Override its options in your user module
-(`lua/modules/user/init.lua`):
+Install and manage it (with `lvim-pkg`) from the LVIM package manager — open the
+**Plugins** tab and install / update / pin it:
 
-```lua
-modules["lvim-tech/lvim-ts"] = {
-    dependencies = { "lvim-tech/lvim-pkg" },
-    opts = { auto_install = false }, -- offer parsers via lvim-installer's prompt
-}
+```vim
+:LvimInstaller plugins
 ```
+
+lvim-installer installs plugins through Neovim's built-in `vim.pack`, so no external
+plugin manager is needed. With `lvim-installer` active, set `auto_install = false` so
+missing parsers are offered through the unified prompt instead of installing silently.
 
 ### lazy.nvim
 
@@ -41,18 +42,6 @@ return {
         require("lvim-ts").setup({ auto_install = true })
     end,
 }
-```
-
-### Native (vim.pack / packadd)
-
-```lua
--- In your init.lua, after the plugin is on the runtimepath:
-vim.pack.add({
-    { src = "https://github.com/lvim-tech/lvim-pkg" },
-    { src = "https://github.com/lvim-tech/lvim-ts" },
-})
-
-require("lvim-ts").setup({ auto_install = true })
 ```
 
 ### packer.nvim
@@ -67,8 +56,15 @@ use({
 })
 ```
 
-> With `lvim-installer` active, set `auto_install = false` so missing parsers are
-> offered through the unified prompt instead of installing silently.
+### Native (vim.pack)
+
+```lua
+vim.pack.add({
+    { src = "https://github.com/lvim-tech/lvim-pkg" },
+    { src = "https://github.com/lvim-tech/lvim-ts" },
+})
+require("lvim-ts").setup({ auto_install = true })
+```
 
 ## Usage / Configuration
 
@@ -109,8 +105,10 @@ require("lvim-ts").setup({
             ["aa"] = "@parameter.outer", -- a parameter / argument (+ its comma)
             ["ia"] = "@parameter.inner", -- inner parameter
         },
-        -- types = { ["function"] = { ... }, class = { ... }, parameter = { ... }, block = { ... } }
+        -- types = { ["function"] = { ... }, class = { ... }, block = { ... } }
         -- maps each logical kind to the node types counting as it; extend per language as needed.
+        -- lists = { parameter = { "parameters", "arguments", ... } }
+        -- the list nodes whose named child is one parameter/argument; extend per language as needed.
     },
 })
 ```
