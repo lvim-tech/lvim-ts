@@ -5,7 +5,9 @@
 -- -1 ("keep the current indent") whenever it is unsure, so it never indents worse than
 -- Neovim's filetype indent. Covers @indent.begin / branch / dedent / ignore / zero, and
 -- @indent.align (aligns to the column after the open delimiter; the close delimiter row
--- de-aligns to the opener's indent), gated on the open/close delimiter metadata.
+-- de-aligns to the opener's indent), gated on the open/close delimiter metadata. Injected
+-- languages indent by their own grammar: the innermost tree/lang at the line is resolved
+-- via LanguageTree:language_for_range (a lua block in markdown indents by lua rules).
 --
 ---@module "lvim-ts.core.indent"
 
@@ -105,18 +107,11 @@ function M.indentexpr(lnum)
     if not ok or not parser then
         return -1
     end
-    local trees = parser:parse({ lnum - 1, lnum })
-    local tree = trees and trees[1]
-    if not tree then
+    -- Parse only the target line's range (never parse(true): that force-parses every injection
+    -- on every indentexpr call — O(document) per line during a `=` re-indent).
+    if not pcall(parser.parse, parser, { lnum - 1, lnum }) then
         return -1
     end
-    local lang = parser:lang()
-    local query = vim.treesitter.query.get(lang, "indents")
-    if not query then
-        return -1
-    end
-    local root = tree:root()
-    local maps = maps_for(bufnr, lang, query, root)
 
     local function get_line(n)
         return vim.api.nvim_buf_get_lines(bufnr, n - 1, n, false)[1] or ""
@@ -129,6 +124,25 @@ function M.indentexpr(lnum)
     -- carry @indent.branch/@indent.end) in the walk.
     local line = get_line(lnum)
     local col = line:match("^%s*$") and 0 or #(line:match("^%s*") or "")
+    local point = { lnum - 1, col, lnum - 1, col }
+
+    -- Resolve the INNERMOST injected language covering the line, so embedded code (e.g. a lua
+    -- block in a markdown file) indents by its OWN grammar's indents.scm rather than the host's.
+    -- For a non-injected buffer language_for_range/tree_for_range resolve to the root parser and
+    -- its tree, so behaviour is identical to a plain single-language buffer.
+    local ltree = parser:language_for_range(point)
+    local lang = ltree:lang()
+    local query = vim.treesitter.query.get(lang, "indents")
+    if not query then
+        return -1
+    end
+    local tree = ltree:tree_for_range(point)
+    if not tree then
+        return -1
+    end
+    local root = tree:root()
+    local maps = maps_for(bufnr, lang, query, root)
+
     local node = root:descendant_for_range(lnum - 1, col, lnum - 1, col)
     if not node then
         return -1
