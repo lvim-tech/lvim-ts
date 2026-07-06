@@ -10,7 +10,7 @@ local config = require("lvim-ts.config")
 
 local M = {}
 
----@type table<integer, TSNode[]>  window id -> node stack (innermost first .. outermost last)
+---@type table<integer, { buf: integer, tick: integer, nodes: TSNode[] }>  window id -> selection state
 local stacks = {}
 
 --- Visually select a node's range (charwise). Treesitter ranges are 0-based with an
@@ -18,7 +18,7 @@ local stacks = {}
 ---@param node TSNode
 local function select_node(node)
     local sr, sc, er, ec = node:range()
-    if ec == 0 and er > 0 then
+    if ec == 0 and er > sr then
         er = er - 1
         ec = #(vim.api.nvim_buf_get_lines(0, er, er + 1, false)[1] or "")
     end
@@ -41,8 +41,22 @@ function M.init()
     if not ok or not node then
         return
     end
-    stacks[vim.api.nvim_get_current_win()] = { node }
+    local buf = vim.api.nvim_get_current_buf()
+    stacks[vim.api.nvim_get_current_win()] =
+        { buf = buf, tick = vim.api.nvim_buf_get_changedtick(buf), nodes = { node } }
     select_node(node)
+end
+
+---@param win integer
+---@return TSNode[]|nil
+local function valid_stack(win)
+    local st = stacks[win]
+    local buf = vim.api.nvim_get_current_buf()
+    if not st or st.buf ~= buf or st.tick ~= vim.api.nvim_buf_get_changedtick(buf) then
+        stacks[win] = nil
+        return nil
+    end
+    return st.nodes
 end
 
 --- Grow the selection to the parent node, or (scope) to the nearest multi-line ancestor.
@@ -50,7 +64,7 @@ end
 ---@return nil
 function M.grow(scope)
     local win = vim.api.nvim_get_current_win()
-    local stack = stacks[win]
+    local stack = valid_stack(win)
     if not stack or #stack == 0 then
         return M.init()
     end
@@ -74,7 +88,7 @@ end
 --- Shrink the selection back to the previous node.
 ---@return nil
 function M.shrink()
-    local stack = stacks[vim.api.nvim_get_current_win()]
+    local stack = valid_stack(vim.api.nvim_get_current_win())
     if not stack or #stack <= 1 then
         return
     end
@@ -104,6 +118,16 @@ function M.attach(buf)
     map("x", km.scope_incremental, function()
         M.grow(true)
     end, "lvim-ts: grow scope")
+    vim.api.nvim_create_autocmd({ "WinClosed", "ModeChanged" }, {
+        group = vim.api.nvim_create_augroup("LvimTsSelection", { clear = false }),
+        callback = function(ev)
+            if ev.event == "WinClosed" then
+                stacks[tonumber(ev.match)] = nil
+            elseif vim.v.event and tostring(vim.v.event.new_mode or ""):sub(1, 1) == "n" then
+                stacks[vim.api.nvim_get_current_win()] = nil
+            end
+        end,
+    })
 end
 
 return M

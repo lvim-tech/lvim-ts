@@ -29,7 +29,7 @@ local function collect(query, root, bufnr)
     local maps = { begins = {}, dedent = {}, branch = {}, ends = {}, ignore = {}, zero = {}, align = {} }
     -- iter_matches (not iter_captures): the `#set! indent.open_delimiter` directives that drive
     -- @indent.align are MATCH-level metadata, which iter_captures does not expose.
-    for _, match, meta in query:iter_matches(root, bufnr, 0, -1, { all = true }) do
+    for _, match, meta in query:iter_matches(root, bufnr, 0, -1) do
         for id, nodes in pairs(match) do
             local cap = query.captures[id]
             local key = CAPTURE[cap]
@@ -67,6 +67,13 @@ end
 ---@type table<integer, { tick: integer, lang: string, maps: table }>  per-buffer collect() cache
 local cache = {}
 
+vim.api.nvim_create_autocmd("BufWipeout", {
+    group = vim.api.nvim_create_augroup("LvimTsIndent", { clear = true }),
+    callback = function(args)
+        cache[args.buf] = nil
+    end,
+})
+
 --- collect() scans the whole tree (O(tree)) and runs on every indentexpr call (i.e. per line
 --- during a `=` re-indent). The tree only changes when the buffer does, so cache the maps per
 --- buffer keyed by 'changedtick': an indentexpr over an unchanged buffer (a re-indent of
@@ -98,7 +105,7 @@ function M.indentexpr(lnum)
     if not ok or not parser then
         return -1
     end
-    local trees = parser:parse(true)
+    local trees = parser:parse({ lnum - 1, lnum })
     local tree = trees and trees[1]
     if not tree then
         return -1
@@ -132,6 +139,7 @@ function M.indentexpr(lnum)
     local dedents = 0 -- @indent.branch/@indent.dedent on the line itself
     local counted = {} -- start rows already credited (avoid double-counting per row)
     local align_col = nil -- @indent.align: absolute column for lines inside an aligned node
+    local saw_capture = false
 
     local row = lnum - 1 -- 0-based target row
 
@@ -145,6 +153,7 @@ function M.indentexpr(lnum)
             return 0
         end
         if maps.ignore[id] then
+            saw_capture = true
             break -- stop accumulating opener levels above an ignored node
         end
         -- @indent.align: the innermost aligned ancestor wins. Inner rows align to just after the
@@ -167,18 +176,23 @@ function M.indentexpr(lnum)
             end
         end
         if maps.begins[id] and srow < row and not counted[srow] then
+            saw_capture = true
             levels = levels + 1
             counted[srow] = true
         end
         -- A branch (else / elseif), an explicit dedent, or a closing token (@indent.end:
         -- end / } / ]) that sits on this line pulls one level back. Counted once per node.
         if (maps.branch[id] or maps.dedent[id] or maps.ends[id]) and srow == row then
+            saw_capture = true
             dedents = dedents + 1
         end
         node = node:parent()
     end
     if align_col then
         return align_col
+    end
+    if not saw_capture then
+        return -1
     end
     return math.max(0, (levels - dedents) * sw)
 end

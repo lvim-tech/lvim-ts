@@ -12,7 +12,7 @@ local textobjects = require("lvim-ts.core.textobjects")
 
 local M = {}
 
----@type table<string, boolean>  Parsers with an install in flight (dedupe guard)
+---@type table<string, integer[]>  Parsers with an install in flight (pending buffers to enable)
 local installing = {}
 
 --- The lvim-pkg data hub, or nil when it is unavailable.
@@ -59,7 +59,9 @@ function M.enable(buf, lang)
     if not vim.api.nvim_buf_is_valid(buf) then
         return
     end
-    pcall(vim.treesitter.start, buf, lang)
+    if not pcall(vim.treesitter.start, buf, lang) then
+        return
+    end
     -- Query-based ts indent (only when the language ships indents.scm). The indentexpr
     -- itself returns -1 (keep current indent) whenever it is unsure, so it never
     -- regresses below Neovim's filetype indent.
@@ -71,8 +73,8 @@ function M.enable(buf, lang)
     -- buffer later inherit nothing here; this covers the common load-in-a-window case.
     if config.fold and vim.treesitter.query.get(lang, "folds") then
         for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-            vim.wo[win].foldmethod = "expr"
-            vim.wo[win].foldexpr = "v:lua.vim.treesitter.foldexpr()"
+            vim.wo[win][0].foldmethod = "expr"
+            vim.wo[win][0].foldexpr = "v:lua.vim.treesitter.foldexpr()"
         end
     end
     -- Node-based incremental selection keymaps (opt-in), scoped to this buffer.
@@ -119,25 +121,39 @@ function M.activate(buf)
         -- Migration: a parser compiled by the old nvim-treesitter may have no queries in
         -- our dir. Fetch them once before enabling so highlighting actually works.
         local backend = p.backend("parser")
-        if backend and backend.has_queries and not backend.has_queries(lang) and not installing[lang] then
-            installing[lang] = true
+        if backend and backend.has_queries and not backend.has_queries(lang) then
+            if installing[lang] then
+                installing[lang][#installing[lang] + 1] = buf
+                return
+            end
+            installing[lang] = { buf }
             backend.install_queries(lang, function()
+                local pending = installing[lang] or {}
                 installing[lang] = nil
-                M.enable(buf, lang)
+                for _, b in ipairs(pending) do
+                    M.enable(b, lang)
+                end
             end)
         else
             M.enable(buf, lang)
         end
         return
     end
-    if not config.auto_install or installing[lang] or not is_available(p, lang) then
+    if not config.auto_install or not is_available(p, lang) then
         return
     end
-    installing[lang] = true
+    if installing[lang] then
+        installing[lang][#installing[lang] + 1] = buf
+        return
+    end
+    installing[lang] = { buf }
     p.install("parser", { lang }, function(err)
+        local pending = installing[lang] or {}
         installing[lang] = nil
         if not err then
-            M.enable(buf, lang)
+            for _, b in ipairs(pending) do
+                M.enable(b, lang)
+            end
         end
     end)
 end
