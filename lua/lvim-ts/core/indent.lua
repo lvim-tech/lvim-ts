@@ -88,12 +88,17 @@ vim.api.nvim_create_autocmd("BufWipeout", {
 ---@return table  capture name -> set of node ids; plus `align` -> id -> alignment info
 local function maps_for(bufnr, lang, query, root)
     local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+    local rid = root:id()
     local c = cache[bufnr]
-    if c and c.tick == tick and c.lang == lang then
+    -- Key on the TREE identity too: a buffer with two same-language injected regions (two ```lua blocks in
+    -- markdown) shares (tick, lang), but each tree's node ids differ — without `root` the 2nd block hits the
+    -- 1st's maps, every id lookup misses, and it silently returns -1. Node ids are stable across re-parses of
+    -- an unchanged tree, which is exactly what makes this cache valid, so root:id() is a sound same-tick key.
+    if c and c.tick == tick and c.lang == lang and c.root == rid then
         return c.maps
     end
     local maps = collect(query, root, bufnr)
-    cache[bufnr] = { tick = tick, lang = lang, maps = maps }
+    cache[bufnr] = { tick = tick, lang = lang, root = rid, maps = maps }
     return maps
 end
 

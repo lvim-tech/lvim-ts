@@ -13,6 +13,28 @@ local M = {}
 ---@type table<integer, { buf: integer, tick: integer, nodes: TSNode[] }>  window id -> selection state
 local stacks = {}
 
+---@type boolean  the ONE global cleanup autocmd is installed once, not per attached buffer
+local cleanup_installed = false
+
+--- Install the single GLOBAL WinClosed/ModeChanged cleanup handler (drops a window's stale selection stack).
+--- Guarded so `attach(buf)` — which runs per treesitter buffer — does not stack N identical global callbacks.
+local function ensure_cleanup()
+    if cleanup_installed then
+        return
+    end
+    cleanup_installed = true
+    vim.api.nvim_create_autocmd({ "WinClosed", "ModeChanged" }, {
+        group = vim.api.nvim_create_augroup("LvimTsSelection", { clear = true }),
+        callback = function(ev)
+            if ev.event == "WinClosed" then
+                stacks[tonumber(ev.match)] = nil
+            elseif vim.v.event and tostring(vim.v.event.new_mode or ""):sub(1, 1) == "n" then
+                stacks[vim.api.nvim_get_current_win()] = nil
+            end
+        end,
+    })
+end
+
 --- Visually select a node's range (charwise). Treesitter ranges are 0-based with an
 --- EXCLUSIVE end column; a range that ends at column 0 actually ends on the line above.
 ---@param node TSNode
@@ -118,16 +140,7 @@ function M.attach(buf)
     map("x", km.scope_incremental, function()
         M.grow(true)
     end, "lvim-ts: grow scope")
-    vim.api.nvim_create_autocmd({ "WinClosed", "ModeChanged" }, {
-        group = vim.api.nvim_create_augroup("LvimTsSelection", { clear = false }),
-        callback = function(ev)
-            if ev.event == "WinClosed" then
-                stacks[tonumber(ev.match)] = nil
-            elseif vim.v.event and tostring(vim.v.event.new_mode or ""):sub(1, 1) == "n" then
-                stacks[vim.api.nvim_get_current_win()] = nil
-            end
-        end,
-    })
+    ensure_cleanup()
 end
 
 return M

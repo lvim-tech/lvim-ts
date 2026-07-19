@@ -19,7 +19,10 @@ function M.missing_for_ft(ft)
     if not ok then
         return nil
     end
-    local lang = vim.treesitter.language.get_lang(ft) or ft
+    -- Mirror manager.lang_for_buf's resolution (config.language_map first) so the install prompt checks/offers
+    -- the SAME parser `activate` will want — else a mapped ft (e.g. `["html.handlebars"]="glimmer"`) offers the
+    -- wrong/absent parser and auto_install can never satisfy it.
+    local lang = require("lvim-ts.config").language_map[ft] or vim.treesitter.language.get_lang(ft) or ft
     if pkg.is_installed("parser", lang) then
         return nil
     end
