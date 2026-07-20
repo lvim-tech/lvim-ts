@@ -129,6 +129,16 @@ function M.enable(buf, lang)
     manager.enable(buf, lang)
 end
 
+--- (Re-)activate treesitter for a buffer: resolve its language — including a buffer-local
+--- `b:lvim_ts_lang` override — and enable highlighting (installing the parser first when
+--- `auto_install` is on). Call this after CHANGING `b:lvim_ts_lang`, so the new grammar
+--- takes over (a running highlighter for the old language is stopped by the switch).
+---@param buf integer
+---@return nil
+function M.activate(buf)
+    manager.activate(buf)
+end
+
 --- Parser language `ft` is missing (for the unified installer prompt), or nil.
 ---@param ft string
 ---@return string|nil

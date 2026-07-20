@@ -140,7 +140,17 @@ parameter swallows the adjacent comma. `class` inner is best-effort across gramm
 | `setup(opts)` | Register on-demand activation + the parser requirement provider. |
 | `lang_for_buf(buf)` | Resolve a buffer's parser language. |
 | `enable(buf, lang)` | Enable built-in highlighting + query-based indent for a buffer. |
+| `activate(buf)` | (Re-)resolve the buffer's language and enable it — call after changing `b:lvim_ts_lang`. |
 | `missing_for_ft(ft)` | Parser a filetype needs but lacks, or `nil`. |
+
+### Buffer-local grammar override
+
+A plugin that owns a buffer whose **grammar is not its filetype** sets the buffer-local
+`b:lvim_ts_lang` and calls `activate(buf)` — the override wins over `language_map` and the
+filetype resolution, and switching it stops the old grammar's highlighter before starting
+the new one. Example: lvim-db's query editor keeps its real `sql` filetype (so LSP and
+completion stay attached) but flips the grammar to `json` while a MongoDB connection is
+active, since its statements are extended-JSON commands.
 
 ## Requirements
 

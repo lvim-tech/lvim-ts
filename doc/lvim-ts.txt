@@ -125,14 +125,25 @@ On `setup()`:
   - installs a FileType autocmd that activates every buffer (and sweeps the
     already-open ones).
 
-On activation of a buffer (|lvim-ts.activate|, internal):
-  - resolve the parser language from the filetype,
+On activation of a buffer (also public: |lvim-ts-api| `activate(buf)`):
+  - resolve the parser language — a buffer-local `b:lvim_ts_lang` override
+    first, else `language_map`, else the filetype,
   - if the parser is installed, enable highlighting (and fetch missing queries
     once, for a parser migrated from nvim-treesitter),
   - else, when `auto_install` is on and the parser is available, install it via
     lvim-pkg and enable on completion.
 
 Activation never blocks: installs are asynchronous and de-duplicated.
+
+Buffer-local grammar override ~
+
+A plugin that owns a buffer whose GRAMMAR is not its filetype sets the
+buffer-local `b:lvim_ts_lang` and calls `activate(buf)` — the override wins
+over every filetype mapping, and switching it stops the old grammar's
+highlighter before starting the new one. Example: lvim-db's query editor keeps
+its real `sql` filetype (LSP / completion stay attached) but flips the grammar
+to `json` while a MongoDB connection is active (its statements are
+extended-JSON commands).
 
 ==============================================================================
 5. INDENTATION                                              *lvim-ts-indent*
@@ -190,6 +201,8 @@ Extend a kind for a language by adding node types to `textobjects.types`, e.g.: 
   ts.setup(opts)            register activation + the requirement provider
   ts.lang_for_buf(buf)      resolve a buffer's parser language (string|nil)
   ts.enable(buf, lang)      enable highlighting + query indent for a buffer
+  ts.activate(buf)          (re-)resolve the buffer's language and enable it —
+                            call after changing `b:lvim_ts_lang`
   ts.missing_for_ft(ft)     parser a filetype needs but lacks (string|nil)
 
 ==============================================================================

@@ -22,12 +22,20 @@ local function pkg()
     return ok and mod or nil
 end
 
---- Resolve the parser language for a buffer's filetype.
+--- Resolve the parser language for a buffer's filetype. A buffer-local `b:lvim_ts_lang`
+--- set by the OWNING plugin wins over every filetype mapping — the self-registration seam
+--- for buffers whose GRAMMAR is not their filetype (e.g. lvim-db's query editor: the ft
+--- stays real `sql` so LSP/completion attach, but a MongoDB connection's statements are
+--- extended-JSON, so it sets `lvim_ts_lang = "json"` and calls `require("lvim-ts").activate`).
 ---@param buf integer  Buffer handle
 ---@return string|nil
 function M.lang_for_buf(buf)
     if not vim.api.nvim_buf_is_valid(buf) then
         return nil
+    end
+    local override = vim.b[buf].lvim_ts_lang
+    if type(override) == "string" and override ~= "" then
+        return override
     end
     local ft = vim.bo[buf].filetype
     if ft == "" then
@@ -58,6 +66,13 @@ end
 function M.enable(buf, lang)
     if not vim.api.nvim_buf_is_valid(buf) then
         return
+    end
+    -- A LANGUAGE SWITCH (b:lvim_ts_lang changed, then a re-activate): stop the old
+    -- highlighter first — vim.treesitter.start would otherwise leave the previous
+    -- grammar's highlighter attached alongside the new one.
+    local running = vim.treesitter.highlighter.active[buf]
+    if running and running.tree and running.tree:lang() ~= lang then
+        vim.treesitter.stop(buf)
     end
     if not pcall(vim.treesitter.start, buf, lang) then
         return
