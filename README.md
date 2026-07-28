@@ -32,30 +32,6 @@ lvim-installer installs plugins through Neovim's built-in `vim.pack`, so no exte
 plugin manager is needed. With `lvim-installer` active, set `auto_install = false` so
 missing parsers are offered through the unified prompt instead of installing silently.
 
-### lazy.nvim
-
-```lua
-return {
-    "lvim-tech/lvim-ts",
-    dependencies = { "lvim-tech/lvim-pkg" },
-    config = function()
-        require("lvim-ts").setup({ auto_install = true })
-    end,
-}
-```
-
-### packer.nvim
-
-```lua
-use({
-    "lvim-tech/lvim-ts",
-    requires = { "lvim-tech/lvim-pkg" },
-    config = function()
-        require("lvim-ts").setup({ auto_install = true })
-    end,
-})
-```
-
 ### Native (vim.pack)
 
 ```lua

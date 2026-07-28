@@ -42,24 +42,6 @@ external plugin manager is needed. With lvim-installer active, set
 `auto_install = false` so missing parsers are offered through the unified
 prompt instead of installing silently.
 
-lazy.nvim: >lua
-  {
-      "lvim-tech/lvim-ts",
-      dependencies = { "lvim-tech/lvim-pkg" },
-      config = function()
-          require("lvim-ts").setup({ auto_install = true })
-      end,
-  }
-<
-packer.nvim: >lua
-  use({
-      "lvim-tech/lvim-ts",
-      requires = { "lvim-tech/lvim-pkg" },
-      config = function()
-          require("lvim-ts").setup({ auto_install = true })
-      end,
-  })
-<
 Native (vim.pack): >lua
   vim.pack.add({
       { src = "https://github.com/lvim-tech/lvim-pkg" },
