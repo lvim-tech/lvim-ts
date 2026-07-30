@@ -62,8 +62,9 @@ function M.check()
     local sel = config.incremental_selection or {}
     local to = config.textobjects or {}
     h.info(
-        ("features: fold=%s  incremental_selection=%s  textobjects=%s"):format(
-            tostring(config.fold == true),
+        ("features: fold.expr=%s fold.text=%s  incremental_selection=%s  textobjects=%s"):format(
+            tostring((config.fold or {}).expr == true),
+            tostring((config.fold or {}).text == true),
             tostring(sel.enable == true),
             tostring(to.enable == true)
         )

@@ -83,14 +83,10 @@ function M.enable(buf, lang)
     if vim.treesitter.query.get(lang, "indents") then
         vim.bo[buf].indentexpr = "v:lua.require'lvim-ts.core.indent'.indentexpr()"
     end
-    -- Treesitter folding (opt-in) — set the window-local fold options on every window currently
-    -- showing this buffer, when the language ships a `folds` query. New windows that open the
-    -- buffer later inherit nothing here; this covers the common load-in-a-window case.
-    if config.fold and vim.treesitter.query.get(lang, "folds") then
-        for _, win in ipairs(vim.fn.win_findbuf(buf)) do
-            vim.wo[win][0].foldmethod = "expr"
-            vim.wo[win][0].foldexpr = "v:lua.vim.treesitter.foldexpr()"
-        end
+    -- Treesitter folding (opt-in), when the language ships a `folds` query. `attach_expr` owns the
+    -- window options and keeps them applied to windows the buffer appears in later.
+    if config.fold and config.fold.expr and vim.treesitter.query.get(lang, "folds") then
+        require("lvim-ts.core.fold").attach_expr(buf)
     end
     -- Node-based incremental selection keymaps (opt-in), scoped to this buffer.
     if config.incremental_selection and config.incremental_selection.enable then

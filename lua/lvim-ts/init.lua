@@ -75,6 +75,16 @@ function M.setup(opts)
         end
     end
 
+    -- The plugin's own highlight groups, re-derived from the live palette on every ColorScheme /
+    -- palette sync — the shared bind, so they track the theme like every other plugin's.
+    pcall(function()
+        require("lvim-utils.highlight").bind(require("lvim-ts.highlights").build)
+    end)
+
+    -- The collapsed fold line. `enable` remembers the previous 'foldtext', so turning it off later
+    -- hands the option back rather than guessing at a default.
+    require("lvim-ts.core.fold").enable(config.fold and config.fold.text == true)
+
     -- Tell lvim-pkg which parser a filetype needs, for the unified prompt.
     local ok, pkg = pcall(require, "lvim-pkg")
     if ok then

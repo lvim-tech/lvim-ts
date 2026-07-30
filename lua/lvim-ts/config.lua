@@ -14,24 +14,95 @@
 ---@field lists   table<string, string[]>       list-item kind -> list node types (select a child)
 ---@field keymaps table<string, string>         lhs -> "@<kind>.<inner|outer>" spec
 
+---@class LvimTsFold
+---@field expr       boolean               Own 'foldexpr'/'foldmethod' where the language ships a `folds` query
+---@field text       boolean               Own 'foldtext': the collapsed line, still syntax-highlighted
+---@field show_end   boolean               Append the fold's LAST line after the counter
+---@field pad        string                Written after the collapsed line, before the rule
+---@field fill       string|false          The rule character ('fillchars' `fold`); false leaves it alone
+---@field counter    string                `string.format` pattern for the collapsed line count
+---@field left       string                glyphs before the counter
+---@field right      string                glyphs after the counter
+---@field highlights { icon: string, counter: string, fallback: string }  group NAMES, if you paint them yourself
+
 ---@class LvimTsConfig
 ---@field auto_install     boolean          Install a missing parser automatically on first open
 ---@field ensure_installed string[]|"all"   Parsers to install at setup; "all" = every available one
 ---@field ignore_install   string[]         When ensure_installed = "all", parsers to exclude
----@field fold             boolean          Enable treesitter folding (foldexpr) when a `folds` query exists
+---@field fold             LvimTsFold       Treesitter folding: the expression, the collapsed line, its parts
+---@field colors           LvimTsColors     Palette accents this plugin's own highlight groups derive from
 ---@field max_filesize     integer          Skip treesitter above this many bytes (0 = no limit)
 ---@field language_map     table<string, string>  filetype -> parser language overrides
 ---@field update_outdated  boolean          At setup, update installed parsers behind the registry
 ---@field incremental_selection LvimTsIncrementalSelection
 ---@field textobjects      LvimTsTextObjects
 
+---@class LvimTsColor
+---@field accent string             a palette KEY ("blue", "yellow", …) or a literal "#rrggbb"
+---@field tint   string|number|nil  a role from the shared tint scale, or a raw 0..1 factor
+---@field bold   boolean|nil
+
+---@class LvimTsColors
+---@field fold_icon    LvimTsColor  the bracket glyphs around the counter
+---@field fold_counter LvimTsColor  the "+N lines" counter
+---@field fold_fill    LvimTsColor  the stretches of the folded line no capture covers
+---@field fold_line    LvimTsColor|false  the rule drawn to the window edge (the editor's `Folded`)
+
 ---@type LvimTsConfig
 return {
     auto_install = true,
     ensure_installed = {},
     ignore_install = {},
-    -- Treesitter folding (foldexpr) — off by default since it changes fold behaviour.
-    fold = false,
+    -- TREESITTER FOLDING. `expr` changes how the buffer folds, so it stays off unless asked for;
+    -- `text` only changes how an ALREADY folded line is drawn, and is worth having whenever the
+    -- fold expression comes from treesitter at all — it re-runs the `highlights` query over the
+    -- fold's first (and last) line, so a collapsed fold keeps the colours it had open instead of
+    -- collapsing to one flat `Folded`.
+    fold = {
+        expr = false,
+        text = true,
+        show_end = true,
+        -- The gap between the collapsed line and the rule drawn to the window edge, so the text
+        -- does not touch it — the mirror of the space the left glyph already carries.
+        pad = " ",
+        -- THE RULE ITSELF. Neovim draws it from 'fillchars' `fold`, whose default is a middle dot
+        -- repeated to the edge; owning the whole collapsed line means owning its character too,
+        -- rather than leaving half of the look in the host's options. `false` keeps whatever the
+        -- editor already has.
+        fill = "─",
+        counter = "+%d lines",
+        left = " ─┤ ",
+        right = " ├─ ",
+        -- The groups the collapsed line paints with. They are this plugin's OWN (built from the
+        -- live palette in highlights.lua, so they follow the theme) — name someone else's here
+        -- only if you want the fold line to borrow another plugin's colours.
+        highlights = {
+            icon = "LvimTsFoldIcon",
+            counter = "LvimTsFoldCounter",
+            fallback = "LvimTsFoldFill",
+        },
+    },
+    -- THE PALETTE ACCENTS this plugin's own groups derive from (highlights.lua builds them and
+    -- rebinds on ColorScheme, so they follow the theme). Accents are palette KEYS, never hexes;
+    -- `tint` names a role in the shared lvim-utils tint scale, which quiets the accent toward the
+    -- editor background instead of shouting at full saturation.
+    colors = {
+        -- The brackets framing the counter: the same blue the set uses for chrome. NO tint — the
+        -- shared scale blends toward the editor BACKGROUND, which is right for a wash and wrong for
+        -- a glyph (measured: `separator` put the brackets at #273238, a shade off the background).
+        fold_icon = { accent = "blue" },
+        -- The counter itself — yellow, so the one piece of INFORMATION on the line is what the eye
+        -- lands on, and it is never mistaken for code.
+        fold_counter = { accent = "yellow", bold = true },
+        -- What no capture covers: comment-grey, the same shade the editor uses for text that is
+        -- present but not the point.
+        fold_fill = { accent = "comment" },
+        -- THE RULE Neovim draws from the collapsed line to the window edge ('fillchars' `fold`).
+        -- That stretch is painted with the editor's own `Folded`, not with anything this plugin
+        -- emits, so matching the brackets means owning that group — set this to `false` to leave
+        -- `Folded` exactly as the colorscheme defines it.
+        fold_line = { accent = "blue" },
+    },
     -- Skip treesitter (highlight / indent / fold) on files larger than this, to avoid lag on
     -- huge buffers. 0 disables the guard. Default 1 MiB.
     max_filesize = 1024 * 1024,
