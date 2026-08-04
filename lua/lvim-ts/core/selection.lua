@@ -28,8 +28,14 @@ local function ensure_cleanup()
         callback = function(ev)
             if ev.event == "WinClosed" then
                 stacks[tonumber(ev.match)] = nil
-            elseif vim.v.event and tostring(vim.v.event.new_mode or ""):sub(1, 1) == "n" then
-                stacks[vim.api.nvim_get_current_win()] = nil
+            else
+                -- ModeChanged: `ev.match` IS "<old_mode>:<new_mode>" (:h ModeChanged) — the same value
+                -- `v:event.new_mode` carries, but typed, which `vim.v.event` is not (Neovim's own meta
+                -- for it lists the yank / complete / dirchanged fields and omits the mode pair).
+                local new_mode = (ev.match or ""):match("[^:]*$") or ""
+                if new_mode:sub(1, 1) == "n" then
+                    stacks[vim.api.nvim_get_current_win()] = nil
+                end
             end
         end,
     })

@@ -29,7 +29,9 @@ local M = {}
 --- what is left. So an enclosing range hands its groups DOWN to the ranges nested inside it and
 --- then drops out, and each surviving chunk lists its groups by priority.
 ---@param linenr integer  1-based line
----@return table[]|nil  chunks, or nil when the line cannot be highlighted (no parser, no query)
+--- The `#` matters: without it the comma after the return NAME reads as a second return value,
+--- and every `return` in this function is then short one value.
+---@return table[]|nil chunks # nil when the line cannot be highlighted (no parser, no query)
 local function parse_line(linenr)
     local buf = api.nvim_get_current_buf()
     local line = api.nvim_buf_get_lines(buf, linenr - 1, linenr, false)[1]

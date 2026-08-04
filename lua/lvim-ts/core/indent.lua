@@ -66,7 +66,7 @@ local function collect(query, root, bufnr)
     return maps
 end
 
----@type table<integer, { tick: integer, lang: string, maps: table }>  per-buffer collect() cache
+---@type table<integer, { tick: integer, lang: string, root: string, maps: table }>  per-buffer collect() cache
 local cache = {}
 
 vim.api.nvim_create_autocmd("BufWipeout", {

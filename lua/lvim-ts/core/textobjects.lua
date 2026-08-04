@@ -55,7 +55,7 @@ local function inner_range(node)
         first = first or c
         last = c
     end
-    if first then
+    if first and last then
         local sr, sc = first:start()
         local _, _, er, ec = last:range()
         return sr, sc, er, ec
@@ -112,10 +112,12 @@ end
 ---@return TSNode?
 local function by_type(node, kind)
     local set = to_set(config.textobjects.types[kind])
-    while node and not set[node:type()] do
-        node = node:parent()
+    ---@type TSNode?  the walk runs off the top of the tree, so the cursor is nullable, not the param
+    local n = node
+    while n and not set[n:type()] do
+        n = n:parent()
     end
-    return node
+    return n
 end
 
 --- Find the target node for a `lists` (list-item) kind: the innermost NAMED node whose
@@ -128,12 +130,14 @@ end
 ---@return TSNode?
 local function by_list_item(node, kind)
     local set = to_set(config.textobjects.lists[kind])
-    while node do
-        local parent = node:parent()
-        if parent and set[parent:type()] and node:named() then
-            return node
+    ---@type TSNode?  the walk runs off the top of the tree, so the cursor is nullable, not the param
+    local n = node
+    while n do
+        local parent = n:parent()
+        if parent and set[parent:type()] and n:named() then
+            return n
         end
-        node = parent
+        n = parent
     end
     return nil
 end
