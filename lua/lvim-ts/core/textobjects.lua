@@ -82,7 +82,8 @@ local function outer_range(node)
         if after then
             er, ec = after:start()
         else
-            _, _, er, ec = nxt:range()
+            -- `select`, not a throwaway pair: an undeclared `_` here is a GLOBAL assignment.
+            er, ec = select(3, nxt:range())
         end
         return sr, sc, er, ec
     end
