@@ -21,12 +21,12 @@ function M.check()
     h.start("lvim-ts")
 
     -- ── core ──────────────────────────────────────────────────────────────────
-    if vim.fn.has("nvim-0.11") == 1 and type(vim.treesitter) == "table" and vim.treesitter.start then
+    if vim.fn.has("nvim-0.12") == 1 and type(vim.treesitter) == "table" and vim.treesitter.start then
         h.ok("built-in vim.treesitter available (no nvim-treesitter)")
     else
-        -- 0.11 is the real floor: indent.lua consumes the 0.11 `iter_matches` list-shape (match value is a
+        -- 0.12 is the set's floor. indent.lua alone would need 0.11: it consumes the `iter_matches` list-shape (match value is a
         -- LIST of nodes), which throws on 0.10 where each value is a single TSNode.
-        h.error("Neovim >= 0.11 with built-in vim.treesitter is required")
+        h.error("Neovim >= 0.12 with built-in vim.treesitter is required")
     end
 
     local ok_pkg, pkg = pcall(require, "lvim-pkg")
